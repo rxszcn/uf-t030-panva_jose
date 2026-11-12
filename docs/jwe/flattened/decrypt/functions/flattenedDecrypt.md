@@ -1,0 +1,92 @@
+# Function: flattenedDecrypt()
+
+## [💗 Help the project](https://github.com/sponsors/panva)
+
+Support from the community to continue maintaining and improving this module is welcome. If you find the module useful, please consider supporting the project by [becoming a sponsor](https://github.com/sponsors/panva).
+
+## Call Signature
+
+▸ **flattenedDecrypt**(`jwe`, `key`, `options?`): [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<[`FlattenedDecryptResult`](../../../../types/interfaces/FlattenedDecryptResult.md)\>
+
+Authenticates and decrypts a flattened JWE JSON Serialization.
+
+This function is exported (as a named export) from the main `'jose'` module entry point as well
+as from its subpath export `'jose/jwe/flattened/decrypt'`.
+
+### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `jwe` | [`FlattenedJWE`](../../../../types/interfaces/FlattenedJWE.md) | Flattened JWE. |
+| `key` | [`KeyInput`](../../../../types/type-aliases/KeyInput.md) | Private key or shared secret. See [Algorithm Key Requirements](https://github.com/panva/jose/issues/210#jwe-alg). |
+| `options?` | [`DecryptOptions`](../../../../types/interfaces/DecryptOptions.md) | JWE Decryption options. |
+
+### Returns
+
+[`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<[`FlattenedDecryptResult`](../../../../types/interfaces/FlattenedDecryptResult.md)\>
+
+### Example
+
+```js
+const jwe = {
+  ciphertext: '9EzjFISUyoG-ifC2mSihfP0DPC80yeyrxhTzKt1C_VJBkxeBG0MI4Te61Pk45RAGubUvBpU9jm4',
+  iv: '8Fy7A_IuoX5VXG9s',
+  tag: 'W76IYV6arGRuDSaSyWrQNg',
+  encrypted_key:
+    'Z6eD4UK_yFb5ZoKvKkGAdqywEG_m0e4IYo0x8Vf30LAMJcsc-_zSgIeiF82teZyYi2YYduHKoqImk7MRnoPZOlEs0Q5BNK1OgBmSOhCE8DFyqh9Zh48TCTP6lmBQ52naqoUJFMtHzu-0LwZH26hxos0GP3Dt19O379MJB837TdKKa87skq0zHaVLAquRHOBF77GI54Bc7O49d8aOrSu1VEFGMThlW2caspPRiTSePDMDPq7_WGk50izRhB3Asl9wmP9wEeaTrkJKRnQj5ips1SAZ1hDBsqEQKKukxP1HtdcopHV5_qgwU8Hjm5EwSLMluMQuiE6hwlkXGOujZLVizA',
+  aad: 'VGhlIEZlbGxvd3NoaXAgb2YgdGhlIFJpbmc',
+  protected: 'eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIn0',
+}
+
+const { plaintext, protectedHeader, additionalAuthenticatedData } =
+  await jose.flattenedDecrypt(jwe, privateKey)
+
+console.log(protectedHeader)
+const decoder = new TextDecoder()
+console.log(decoder.decode(plaintext))
+console.log(decoder.decode(additionalAuthenticatedData))
+```
+
+## Call Signature
+
+▸ **flattenedDecrypt**\<`KeyType`\>(`jwe`, `getKey`, `options?`): [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<[`FlattenedDecryptResult`](../../../../types/interfaces/FlattenedDecryptResult.md) & [`ResolvedKey`](../../../../types/interfaces/ResolvedKey.md)\<`KeyType`\>\>
+
+Authenticates and decrypts a flattened JWE JSON Serialization with a dynamically resolved key,
+included in the result.
+
+### Type Parameters
+
+| Type Parameter | Default type |
+| ------ | ------ |
+| `KeyType` *extends* [`Uint8Array`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) \| [`CryptoKey`](https://developer.mozilla.org/docs/Web/API/CryptoKey) | [`Uint8Array`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) \| [`CryptoKey`](https://developer.mozilla.org/docs/Web/API/CryptoKey) |
+
+### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `jwe` | [`FlattenedJWE`](../../../../types/interfaces/FlattenedJWE.md) | Flattened JWE. |
+| `getKey` | [`FlattenedDecryptGetKey`](../interfaces/FlattenedDecryptGetKey.md)\<`KeyType`\> | Resolves a private key or shared secret from unverified token data. |
+| `options?` | [`DecryptOptions`](../../../../types/interfaces/DecryptOptions.md) | JWE Decryption options. |
+
+### Returns
+
+[`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<[`FlattenedDecryptResult`](../../../../types/interfaces/FlattenedDecryptResult.md) & [`ResolvedKey`](../../../../types/interfaces/ResolvedKey.md)\<`KeyType`\>\>
+
+## Call Signature
+
+▸ **flattenedDecrypt**(`jwe`, `key`, `options?`): [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<[`FlattenedDecryptResult`](../../../../types/interfaces/FlattenedDecryptResult.md) & [`Partial`](https://www.typescriptlang.org/docs/handbook/utility-types.html#partialtype)\<[`ResolvedKey`](../../../../types/interfaces/ResolvedKey.md)\<[`Uint8Array`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) \| [`CryptoKey`](https://developer.mozilla.org/docs/Web/API/CryptoKey)\>\>\>
+
+Authenticates and decrypts a flattened JWE JSON Serialization with a key or key resolver. The
+result includes `key` only when a resolver is used.
+
+### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `jwe` | [`FlattenedJWE`](../../../../types/interfaces/FlattenedJWE.md) | Flattened JWE. |
+| `key` | [`KeyInput`](../../../../types/type-aliases/KeyInput.md) \| [`FlattenedDecryptGetKey`](../interfaces/FlattenedDecryptGetKey.md)\<[`Uint8Array`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) \| [`CryptoKey`](https://developer.mozilla.org/docs/Web/API/CryptoKey)\> | Private key or shared secret, or a function resolving one. |
+| `options?` | [`DecryptOptions`](../../../../types/interfaces/DecryptOptions.md) | JWE Decryption options. |
+
+### Returns
+
+[`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<[`FlattenedDecryptResult`](../../../../types/interfaces/FlattenedDecryptResult.md) & [`Partial`](https://www.typescriptlang.org/docs/handbook/utility-types.html#partialtype)\<[`ResolvedKey`](../../../../types/interfaces/ResolvedKey.md)\<[`Uint8Array`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) \| [`CryptoKey`](https://developer.mozilla.org/docs/Web/API/CryptoKey)\>\>\>

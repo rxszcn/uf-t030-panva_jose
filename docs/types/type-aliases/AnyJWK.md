@@ -1,0 +1,22 @@
+# Type Alias: AnyJWK
+
+## [💗 Help the project](https://github.com/sponsors/panva)
+
+Support from the community to continue maintaining and improving this module is welcome. If you find the module useful, please consider supporting the project by [becoming a sponsor](https://github.com/sponsors/panva).
+
+• **AnyJWK** = [`JWK_EC_Private`](../interfaces/JWK_EC_Private.md) \| [`JWK_EC_Public`](../interfaces/JWK_EC_Public.md) \| [`JWK_RSA_Private`](../interfaces/JWK_RSA_Private.md) \| [`JWK_RSA_Public`](../interfaces/JWK_RSA_Public.md) \| [`JWK_OKP_Private`](../interfaces/JWK_OKP_Private.md) \| [`JWK_OKP_Public`](../interfaces/JWK_OKP_Public.md) \| [`JWK_AKP_Private`](../interfaces/JWK_AKP_Private.md) \| [`JWK_AKP_Public`](../interfaces/JWK_AKP_Public.md) \| [`JWK_oct`](../interfaces/JWK_oct.md)
+
+Discriminated union of supported JSON Web Key shapes, narrowed by the "kty" (Key Type) Parameter.
+
+Unlike [JWK](JWK.md), each member requires and fixes the "kty" (Key Type) Parameter to its key type
+so that the union can be narrowed on it.
+
+## Example
+
+```ts
+let jwk!: jose.AnyJWK
+
+if (jwk.kty === 'EC') {
+  console.log(jwk.crv, jwk.x, jwk.y)
+}
+```

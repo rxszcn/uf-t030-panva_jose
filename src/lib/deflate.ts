@@ -1,0 +1,67 @@
+import type * as types from '../types.d.ts'
+import { JOSENotSupported, JWEInvalid } from '../util/errors.js'
+import { concat } from './buffer_utils.js'
+
+// RFC 7516, Section 4.1.3: DEF denotes raw DEFLATE (RFC 1951); zip must be protected.
+export function validateZip(
+  joseHeader: types.JWEHeaderParameters,
+  protectedHeader: types.JWEHeaderParameters | undefined,
+): void {
+  if (joseHeader.zip !== undefined && joseHeader.zip !== 'DEF') {
+    throw new JOSENotSupported(
+      'Unsupported JWE "zip" (Compression Algorithm) Header Parameter value.',
+    )
+  }
+
+  if (joseHeader.zip !== undefined && !protectedHeader?.zip) {
+    throw new JWEInvalid(
+      'JWE "zip" (Compression Algorithm) Header Parameter MUST be in a protected header.',
+    )
+  }
+}
+
+function supported(name: 'CompressionStream' | 'DecompressionStream') {
+  if (typeof globalThis[name] === 'undefined') {
+    throw new JOSENotSupported(
+      `JWE "zip" (Compression Algorithm) Header Parameter requires the ${name} API.`,
+    )
+  }
+}
+
+async function transform(
+  stream: CompressionStream | DecompressionStream,
+  input: Uint8Array,
+  maxLength = Infinity,
+): Promise<Uint8Array> {
+  const writer = stream.writable.getWriter()
+  writer.write(input as Uint8Array<ArrayBuffer>).catch(() => {})
+  writer.close().catch(() => {})
+
+  const chunks: Uint8Array[] = []
+  let length = 0
+  const reader = stream.readable.getReader()
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    length += value.byteLength
+    if (maxLength !== Infinity && length > maxLength) {
+      await reader.cancel().catch(() => {})
+      throw new JWEInvalid('Decompressed plaintext exceeded the configured limit')
+    }
+  }
+
+  return concat(...chunks)
+}
+
+// draft-ietf-jose-hpke-encrypt-22, Section 7.1, step 12.
+export async function compress(input: Uint8Array): Promise<Uint8Array> {
+  supported('CompressionStream')
+  return transform(new CompressionStream('deflate-raw'), input)
+}
+
+// draft-ietf-jose-hpke-encrypt-22, Section 7.2, step 20. The output-size limit is library policy.
+export async function decompress(input: Uint8Array, maxLength: number): Promise<Uint8Array> {
+  supported('DecompressionStream')
+  return transform(new DecompressionStream('deflate-raw'), input, maxLength)
+}

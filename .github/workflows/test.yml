@@ -1,0 +1,219 @@
+name: Test
+
+permissions: {}
+
+on:
+  push:
+    branches: [main, trigger-ci]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '11 11 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: $/.github/workflows/build.yml
+
+  package:
+    name: package
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - run: npm clean-install
+      - name: Load cached dist
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dist
+          key: ${{ needs.build.outputs.cache-key }}
+          fail-on-cache-miss: true
+      - name: Documented subpath specifiers exist
+        run: npm run check:subpaths
+      - name: Type check the conformance suite
+        run: npm run typecheck:tap
+      - name: Type check the emitted declarations
+        run: npm run typecheck:dist
+      - name: Type-level regression tests
+        run: npm run typecheck:types
+      - name: Packaging metadata, artifact imports, and type resolution
+        run: npm run check:packaging
+      - name: JWS and JWE stay out of each other's bundles
+        run: npm run check:bundles
+      - name: JSR slow types
+        run: npm run build:jsr
+      - name: Docs are in sync with src
+        run: |
+          npm run docs
+          git diff --exit-code -- docs/
+          test -z "$(git status --porcelain --untracked-files=all -- docs/)"
+
+  node-versions:
+    uses: panva/.github/.github/workflows/node-versions.yml@75ad63f5730195dd3e9ec22dbbf29101c99d8501 # v4
+    with:
+      min: 20
+
+  node:
+    name: node (${{ matrix.node-version }}, ${{ matrix.suite }})
+    needs:
+      - node-versions
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ${{ fromJSON(needs.node-versions.outputs.matrix) }}
+        suite:
+          - tap:node
+          - test
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup node
+        id: node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          check-latest: true
+      - run: npm clean-install
+      - name: Run Test Suite
+        run: npm run "$TEST_SUITE"
+        env:
+          TEST_SUITE: ${{ matrix.suite }}
+
+  deno:
+    name: deno
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: latest
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - run: npm clean-install
+      - name: Test Deno Definitions
+        run: deno check --unstable-sloppy-imports src/index.ts
+      - name: Test Deno
+        run: npm run tap:deno
+
+  bun:
+    name: bun
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - run: npm clean-install
+      - name: Test Bun
+        run: npm run tap:bun
+
+  workerd:
+    name: workerd
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            tap/workerd/package-lock.json
+      - run: npm clean-install
+      - run: npm clean-install --prefix tap/workerd
+      - name: Run Test Suite
+        run: npm run tap:workerd
+        env:
+          WORKERD_BIN: ${{ github.workspace }}/tap/workerd/node_modules/.bin/workerd
+          WORKERD_MODULE: ${{ github.workspace }}/tap/workerd/node_modules/workerd
+
+  browsers:
+    name: browsers (${{ matrix.browser }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, safari]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - run: npm clean-install
+      - name: get playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - run: ./node_modules/.bin/playwright install --only-shell chromium firefox webkit
+      - name: Run Test Suite
+        run: npm run tap:browsers
+        env:
+          BROWSER: ${{ matrix.browser }}
+
+  electron:
+    name: electron
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            tap/electron/package-lock.json
+      - run: npm clean-install
+      - name: Install Electron
+        run: npm clean-install --prefix tap/electron
+      - name: Run Test Suite
+        run: npm run tap:electron
+        env:
+          ELECTRON_BIN: ${{ github.workspace }}/tap/electron/node_modules/.bin/electron

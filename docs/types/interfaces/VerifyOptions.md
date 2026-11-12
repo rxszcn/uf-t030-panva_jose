@@ -1,0 +1,35 @@
+# Interface: VerifyOptions
+
+## [💗 Help the project](https://github.com/sponsors/panva)
+
+Support from the community to continue maintaining and improving this module is welcome. If you find the module useful, please consider supporting the project by [becoming a sponsor](https://github.com/sponsors/panva).
+
+JWS Verification options.
+
+## Properties
+
+### algorithms?
+
+• `optional` **algorithms?**: `string`[]
+
+Accepted JWS "alg" (Algorithm) Header Parameter values. Defaults to all algorithms applicable
+to the key or secret. Unsecured JWTs (`alg: "none"`) are never accepted.
+
+***
+
+### crit?
+
+• `optional` **crit?**: `object`
+
+Recognized "crit" (Critical) Header Parameter names. Set each value to `true` to require
+integrity protection, or `false` when protection is optional. The JWS `b64` extension is always
+recognized and processed.
+
+> [!WARNING]\
+> Other extensions are only checked for syntax and optional integrity protection. Their presence
+> is not required by this option. You must check their presence and process them according to the
+> profile's validation steps after the operation succeeds.
+
+#### Index Signature
+
+\[`propName`: `string`\]: `boolean`

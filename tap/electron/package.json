@@ -1,0 +1,7 @@
+{
+  "name": "jose-electron-tests",
+  "private": true,
+  "devDependencies": {
+    "electron": "45.1.0"
+  }
+}

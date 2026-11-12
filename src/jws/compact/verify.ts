@@ -1,0 +1,100 @@
+/**
+ * Verifying JSON Web Signature (JWS) in Compact Serialization
+ *
+ * @module
+ *
+ * @see {@link https://www.rfc-editor.org/info/rfc7515/#section-7.1 RFC 7515, Section 7.1}
+ */
+
+import type * as types from '../../types.d.ts'
+import { prepareVerify, verifyCompact } from '../../lib/jws_verify.js'
+import type { VerifyGetKey } from '../../lib/jws_verify.js'
+
+/**
+ * Resolves a key for Compact JWS verification from unverified headers and token data.
+ *
+ * @typeParam KeyType Type definition of the keys the function resolves. Narrowing it is what lets
+ *   {@link types.ResolvedKey.key ResolvedKey.key} be inferred at the call site.
+ *
+ * @see {@link jwks/remote.createRemoteJWKSet createRemoteJWKSet} to verify using a remote JSON Web Key Set.
+ */
+export interface CompactVerifyGetKey<
+  KeyType extends types.CryptoKey | Uint8Array = types.CryptoKey | Uint8Array,
+> extends types.GetKeyFunction<
+  types.CompactJWSHeaderParameters,
+  types.FlattenedJWSInput,
+  KeyType | types.KeyObject | types.JWK
+> {}
+
+/**
+ * Validates a JWS Compact Serialization (digital signature or MAC) and decodes its JWS Payload.
+ *
+ * This function is exported (as a named export) from the main `'jose'` module entry point as well
+ * as from its subpath export `'jose/jws/compact/verify'`.
+ *
+ * @example
+ *
+ * ```js
+ * const jws =
+ *   'eyJhbGciOiJFUzI1NiJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4.kkAs_gPPxWMI3rHuVlxHaTPfDWDoqdI8jSvuSmqV-8IHIWXg9mcAeC9ggV-45ZHRbiRJ3obUIFo1rHphPA5URg'
+ *
+ * const { payload, protectedHeader } = await jose.compactVerify(jws, publicKey)
+ *
+ * console.log(protectedHeader)
+ * console.log(new TextDecoder().decode(payload))
+ * ```
+ *
+ * @param jws Compact JWS.
+ * @param key Public key or shared secret. See
+ *   {@link https://github.com/panva/jose/issues/210#jws-alg Algorithm Key Requirements}.
+ * @param options JWS Verify options.
+ */
+export function compactVerify(
+  jws: string | Uint8Array,
+  key: types.KeyInput,
+  options?: types.VerifyOptions,
+): Promise<types.CompactVerifyResult>
+/**
+ * Validates a JWS Compact Serialization (digital signature or MAC) and decodes its JWS Payload with
+ * a dynamically resolved key, included in the result.
+ *
+ * @param jws Compact JWS.
+ * @param getKey Resolves a public key or shared secret from unverified token data.
+ * @param options JWS Verify options.
+ */
+export function compactVerify<
+  KeyType extends types.CryptoKey | Uint8Array = types.CryptoKey | Uint8Array,
+>(
+  jws: string | Uint8Array,
+  getKey: CompactVerifyGetKey<KeyType>,
+  options?: types.VerifyOptions,
+): Promise<types.CompactVerifyResult & types.ResolvedKey<KeyType>>
+/**
+ * Validates a JWS Compact Serialization (digital signature or MAC) and decodes its JWS Payload
+ * using a key or key resolver. The result includes `key` only when a resolver is used.
+ *
+ * @param jws Compact JWS.
+ * @param key Public key or shared secret, or a function resolving one.
+ * @param options JWS Verify options.
+ */
+export function compactVerify(
+  jws: string | Uint8Array,
+  key: types.KeyInput | CompactVerifyGetKey,
+  options?: types.VerifyOptions,
+): Promise<types.CompactVerifyResult & Partial<types.ResolvedKey>>
+export async function compactVerify(
+  jws: string | Uint8Array,
+  key: types.KeyInput | CompactVerifyGetKey,
+  options?: types.VerifyOptions,
+) {
+  // A CompactVerifyGetKey declares a narrower Protected Header than a VerifyGetKey does, so it is
+  // not assignable to one. Delegating is nevertheless sound: the core rejects a JWS whose Protected
+  // Header has no "alg" before it ever calls the resolver.
+  const [result] = await verifyCompact(
+    jws,
+    prepareVerify(options),
+    key as types.KeyInput | VerifyGetKey,
+  )
+
+  return result as types.CompactVerifyResult & Partial<types.ResolvedKey>
+}

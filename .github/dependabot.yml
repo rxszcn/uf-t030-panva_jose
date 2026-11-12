@@ -1,0 +1,36 @@
+version: 2
+
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: 'cron'
+      cronjob: '0 9 * * mon#1'
+      timezone: 'Europe/Prague'
+
+updates:
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    patterns:
+      - '*'
+    multi-ecosystem-group: 'dependencies'
+  - package-ecosystem: 'npm'
+    directory: '/'
+    patterns:
+      - '*'
+    multi-ecosystem-group: 'dependencies'
+    allow:
+      - dependency-name: '@playwright/test'
+  - package-ecosystem: 'npm'
+    directory: '/tap/workerd'
+    patterns:
+      - '*'
+    multi-ecosystem-group: 'dependencies'
+    allow:
+      - dependency-name: 'workerd'
+  - package-ecosystem: 'npm'
+    directory: '/tap/electron'
+    patterns:
+      - '*'
+    multi-ecosystem-group: 'dependencies'
+    allow:
+      - dependency-name: 'electron'
