@@ -198,6 +198,7 @@ export async function decryptJWE(
   shared: DecryptShared,
   key: types.KeyInput | DecryptGetKey,
   token: SharedJWE = shareJWE(jwe),
+  onKeyHandling?: () => void,
 ): Promise<types.FlattenedDecryptResult & Partial<types.ResolvedKey>> {
   const [protectedHeader, ciphertext, iv, tag, additionalAuthenticatedData] = token
   const { header, unprotected, aad } = jwe
@@ -285,6 +286,10 @@ export async function decryptJWE(
   }
 
   let resolvedKey = false
+  // Boundary between key-independent structural validation and key-dependent processing. General
+  // JWE uses it to keep post-boundary failures indistinguishable across recipients (RFC 7516,
+  // Sections 11.4 and 11.5) while still surfacing pre-boundary structural faults.
+  onKeyHandling?.()
   if (typeof key === 'function') {
     key = await key(protectedHeader, jwe)
     resolvedKey = true

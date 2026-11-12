@@ -425,15 +425,12 @@ test('General JWE decryption does not hide invalid algorithms options', async ()
     }
   }
   assert.equal(resolveCalls, 0)
-  for (const input of [
-    { ...jwe, ciphertext: null },
-    { ...jwe, protected: '*' },
-    { ...jwe, recipients: [{}] },
-  ]) {
-    await assert.rejects(
-      generalDecrypt(input as never, context.secret),
-      errorLike({ code: 'ERR_JWE_DECRYPTION_FAILED' }),
-    )
+  for (const [input, code] of [
+    [{ ...jwe, ciphertext: null }, 'ERR_JWE_INVALID'],
+    [{ ...jwe, protected: '*' }, 'ERR_JWE_INVALID'],
+    [{ ...jwe, recipients: [{}] }, 'ERR_JWE_INVALID'],
+  ] as const) {
+    await assert.rejects(generalDecrypt(input as never, context.secret), errorLike({ code }))
   }
   for (const options of [
     { keyManagementAlgorithms: [] },
@@ -443,7 +440,7 @@ test('General JWE decryption does not hide invalid algorithms options', async ()
   ]) {
     await assert.rejects(
       generalDecrypt(jwe, resolve, options as types.DecryptOptions),
-      errorLike({ code: 'ERR_JWE_DECRYPTION_FAILED' }),
+      errorLike({ code: 'ERR_JOSE_ALG_NOT_ALLOWED' }),
     )
   }
   assert.equal(resolveCalls, 0)
@@ -560,11 +557,12 @@ test('General JWE format validation', async () => {
   {
     const jwe = { ...generalJwe, recipients: [{}] }
 
+    // A single malformed recipient is a structural fault, not an authentication failure.
     await assert.rejects(
       generalDecrypt(jwe, context.secret),
       errorLike({
-        message: 'decryption operation failed',
-        code: 'ERR_JWE_DECRYPTION_FAILED',
+        message: 'missing JWE Algorithm (alg) in JWE Header',
+        code: 'ERR_JWE_INVALID',
       }),
     )
   }
@@ -599,7 +597,7 @@ test('an empty protected member is not an encoded protected header', async () =>
   await assert.rejects(
     generalDecrypt(jwe, context.secret),
     errorLike({
-      code: 'ERR_JWE_DECRYPTION_FAILED',
+      code: 'ERR_JWE_INVALID',
     }),
   )
 })
@@ -818,6 +816,7 @@ test('single recipient key management parameters are honoured', async () => {
       keyManagementAlgorithms: ['PBES2-HS256+A128KW'],
       maxPBES2Count: 4095,
     }),
+    // The p2c bound is checked during key derivation, so it is post-key-handling and collapses.
     errorLike({ code: 'ERR_JWE_DECRYPTION_FAILED' }),
   )
 })

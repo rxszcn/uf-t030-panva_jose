@@ -58,6 +58,10 @@ if (hasCompressionStreams) {
     const { plaintext } = await generalDecrypt(jwe, context.secret)
     assert.deepStrictEqual(plaintext, context.plaintext)
 
+    // Both faults surface only after the recipient authenticated. In a General JWE that would
+    // reveal which recipient the caller's key was meant for, so the failure collapses just like an
+    // authentication failure (RFC 7516, Sections 11.4 and 11.5). Compact/Flattened keep the
+    // specific structural code.
     for (const maxDecompressedLength of [0, context.plaintext.byteLength - 1]) {
       await assert.rejects(
         generalDecrypt(jwe, context.secret, { maxDecompressedLength }),

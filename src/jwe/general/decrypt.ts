@@ -15,10 +15,33 @@ import {
   snapshotRecipientJWE,
 } from '../../lib/jwe_decrypt.js'
 import type { SharedJWE } from '../../lib/jwe_decrypt.js'
-import { JWEDecryptionFailed, JWEInvalid } from '../../util/errors.js'
+import {
+  JOSEAlgNotAllowed,
+  JWEDecryptionFailed,
+  JWEInvalid,
+  JOSENotSupported,
+} from '../../util/errors.js'
 import { isObject } from '../../lib/validate.js'
 import { JWE, isJWECEKTransport } from '../../lib/jwe_algorithms.js'
 import type * as types from '../../types.d.ts'
+
+/**
+ * Whether an error is a token-structural or policy fault rather than an authentication or key
+ * failure.
+ *
+ * Structural validation runs before any key resolution or cryptographic operation, so these faults
+ * depend only on the unauthenticated token members and the caller's options. Reporting them
+ * uniformly across Compact, Flattened, and General JWE therefore leaks nothing about which
+ * recipient - if any - the caller's key was meant for. Authentication and CEK-recovery failures
+ * stay {@link JWEDecryptionFailed}, as required by RFC 7516, Sections 11.4 and 11.5.
+ */
+function isStructuralJWEError(error: unknown): boolean {
+  return (
+    error instanceof JWEInvalid ||
+    error instanceof JOSENotSupported ||
+    error instanceof JOSEAlgNotAllowed
+  )
+}
 
 /**
  * Resolves a key for General JWE decryption from unverified headers and token data.
@@ -133,16 +156,12 @@ export async function generalDecrypt(
   }
 
   const shared = prepareDecrypt(options)
-  let sharedJwe!: types.FlattenedJWE
-  let token: SharedJWE
-  try {
-    sharedJwe = snapshotSharedJWE(jwe)
-    token = shareJWE(sharedJwe)
-  } catch {
-    // A fault in a shared member is a fault of the token, but reporting it as such would tell a
-    // caller which recipient - if any - their key was meant for. Stay indistinguishable.
-    throw new JWEDecryptionFailed()
-  }
+  // Shared-member faults are token-structural and are checked before any key is touched, so they
+  // carry no information about which recipient the caller's key was meant for. Surface them as the
+  // same JWEInvalid the Compact and Flattened serializations produce instead of masquerading as an
+  // authentication failure.
+  const sharedJwe = snapshotSharedJWE(jwe)
+  const token: SharedJWE = shareJWE(sharedJwe)
 
   const recipientSnapshots = recipients.map((recipient) => snapshotRecipientJWE(recipient))
   // draft-ietf-jose-hpke-encrypt-22, Section 7.2, step 7: single-recipient modes.
@@ -161,15 +180,39 @@ export async function generalDecrypt(
 
   // draft-ietf-jose-hpke-encrypt-22, Section 7.2, step 21: at least one recipient must
   // succeed. This API returns the first success, which is a library selection policy.
-  for (const [recipient] of recipientSnapshots) {
-    if (!recipient) continue
+  let structuralFailure: unknown
+  let reachedKeyHandling = false
+  for (const [recipient, , snapshotError] of recipientSnapshots) {
+    // A recipient snapshot that throws is a fault of the token's own members, observed before any
+    // key is touched. It is therefore structural, not key-dependent.
+    if (!recipient) {
+      structuralFailure ??= snapshotError
+      continue
+    }
+    let enteredKeyHandling = false
     try {
       const flattened: types.FlattenedJWE = { ...sharedJwe, ...recipient }
       checkRecipient(flattened)
-      return await decryptJWE(flattened, shared, key, token)
-    } catch {
-      //
+      return await decryptJWE(flattened, shared, key, token, () => {
+        enteredKeyHandling = true
+        reachedKeyHandling = true
+      })
+    } catch (error) {
+      // The side-channel boundary is key handling, not the exception's class. Structural faults
+      // raised before it (missing alg/enc, bad member types, disallowed algorithms) depend only on
+      // the unauthenticated token and the caller's options, so they stay distinguishable across
+      // every serialization. Anything raised at or after it - including structural-looking errors
+      // from unwrapping a recipient's key - could reveal which recipient the key was meant for and
+      // MUST collapse, per RFC 7516, Sections 11.4 and 11.5.
+      if (!enteredKeyHandling && isStructuralJWEError(error)) {
+        structuralFailure ??= error
+      } else {
+        reachedKeyHandling = true
+      }
     }
+  }
+  if (!reachedKeyHandling && structuralFailure !== undefined) {
+    throw structuralFailure
   }
   throw new JWEDecryptionFailed()
 }
